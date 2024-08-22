@@ -6,7 +6,8 @@ import { getTokenCount } from "./quiz.controller.mjs";
 import strings from "../constants/strings.mjs";
 import mongoConnectionUtils from "../utils/mongo-connection.utils.mjs";
 import { getProductPrice } from "./utils.controller.mjs";
-
+import { fileURLToPath } from "url";
+import { signJWT } from "../utils/jwt.utils.mjs";
 const { badRequest, internalServerErr } = strings;
 
 config();
@@ -45,7 +46,6 @@ export const generateAIQuestions = async (req, res) => {
         if (chunk.choices[0]?.delta?.content) {
           fullResponse += chunk.choices[0]?.delta?.content;
         }
-        process.stdout.write(chunk.choices[0]?.delta?.content || "");
       }
 
       const db = await mongoConnectionUtils.getDB();
@@ -63,120 +63,271 @@ export const generateAIQuestions = async (req, res) => {
         dbOptions
       );
       if (userAck) {
+        const accessToken = signJWT(
+          {
+            email: userDetails?.email,
+            name: userDetails?.name,
+            userId: userDetails?.userId
+          },
+          "30m"
+        );
+
+        const refreshToken = signJWT(
+          {
+            email: userDetails?.email,
+            name: userDetails?.name,
+            userId: userDetails?.userId
+          },
+          "1y"
+        );
+
+        // Set access and refresh token in cookie
+        res.cookie("accessToken", accessToken, {
+          maxAge: 1800000,
+          httpOnly: true,
+          secure: true,
+          sameSite: "none"
+        });
+
+        res.cookie("refreshToken", refreshToken, {
+          maxAge: 3.154e10, // 1 year
+          httpOnly: true,
+          secure: true,
+          sameSite: "none"
+        });
         return res.status(200).json({ response: fullResponse });
       }
-
-      //   const payloads = chunk.toString().split("\n\n");
-      //   for (const payload of payloads) {
-      //     if (payload.includes("[DONE]")) return;
-      //     if (payload.trim()) {
-      //       const data = JSON.parse(payload.replace(/^data: /, ""));
-      //       const content = data.choices[0].delta.content || "";
-      //       fullResponse += content; // Append the content to the full response
-      //       console.log(content); // Optionally, log the streamed content
-      //     }
-      //   }
-      // });
-
-      // response.on("end", async () => {
-      //   console.log("Stream finished.");
-      //   console.log("Full Response:", fullResponse); // Print the entire response
-      //   const db = await mongoConnectionUtils.getDB();
-      //   const userCollection = db.collection("users");
-      //   const userQuery = { userId };
-      //   const userUpdate = {
-      //     $set: {
-      //       tokens: userDetails?.tokens - tokensRequired
-      //     }
-      //   };
-      //   const dbOptions = { upsert: true };
-      //   const userAck = await userCollection.updateOne(
-      //     userQuery,
-      //     userUpdate,
-      //     dbOptions
-      //   );
-      //   if (userAck) {
-      //     return res.status(200).json({ response: fullResponse });
-      //   }
-      // });
     } catch (err) {
-      console.log(err);
       return res.status(500).json({ err });
     }
   }
 };
 
-export const uploadFile = async (req, res) => {
-  console.log(path.resolve("C:/Users/91761/Desktop/quizzy-server/1.pdf"));
-  try {
-    const file = await openai.files.create({
-      file: fs.createReadStream(
-        path.resolve("C:/Users/91761/Desktop/quizzy-server/1.pdf")
-      ),
-      purpose: "assistants"
-    });
-    console.log(file);
-    return res.status(200).json({ message: "File uploaded Successfully" });
-  } catch (err) {
-    console.log(err);
+export const regenerateInFile = async (req, res) => {
+  const { fileId, assistantId, vectoreStoreId, threadId, userId } = req?.body;
+  if (!fileId || !assistantId || !vectoreStoreId || !threadId) {
+    return res.status(400).json({ message: badRequest });
+  }
+  const fileSizIn100KBCount = Math.ceil(req?.file?.size / 1024 / 100);
+  const userDetails = await getTokenCount(userId);
+  const price = await getProductPrice();
+  const tokensRequired =
+    fileSizIn100KBCount <= 5
+      ? price?.products?.MIN_FILE_TOKEN
+      : fileSizIn100KBCount * price?.products?.FILE_100KB || 50;
+  if (!userDetails?.tokens && userDetails?.tokens !== 0) {
+    return res.status(500).json({ message: internalServerErr });
+  } else if (userDetails?.tokens < tokensRequired) {
     return res
-      .status(500)
-      .json({ message: "Unable to upload file, please try agian later" });
-  }
-};
+      .status(403)
+      .json({ message: "You don not have enough tokens to generate quiz" });
+  } else {
+    try {
+      // Run the thread and get the response
+      const stream = openai.beta.threads.runs.stream(threadId, {
+        assistant_id: assistantId
+      });
 
-export const listFiles = async (req, res) => {
-  try {
-    const list = await openai.files.list();
+      stream.on("messageDone", (event) => {
+        if (event.content[0].type === "text") {
+          const accessToken = signJWT(
+            {
+              email: userDetails?.email,
+              name: userDetails?.name,
+              userId: userDetails?.userId
+            },
+            "30m"
+          );
 
-    for await (const file of list) {
-      console.log(file);
+          const refreshToken = signJWT(
+            {
+              email: userDetails?.email,
+              name: userDetails?.name,
+              userId: userDetails?.userId
+            },
+            "1y"
+          );
+          // Set access and refresh token in cookie
+          res.cookie("accessToken", accessToken, {
+            maxAge: 1800000,
+            httpOnly: true,
+            secure: true,
+            sameSite: "none"
+          });
+
+          res.cookie("refreshToken", refreshToken, {
+            maxAge: 3.154e10, // 1 year
+            httpOnly: true,
+            secure: true,
+            sameSite: "none"
+          });
+          res.status(200).json({
+            answer: event.content[0].text,
+            message: "Quiz generated successfully",
+            fileId: fileId,
+            assistant: assistantId,
+            vectorStore: vectoreStoreId
+          });
+        }
+      });
+    } catch (err) {
+      res.status(500).json({
+        message: internalServerErr
+      });
     }
-    return res.status(200).json({ list });
-  } catch (err) {
-    return res.status(500).json({ message: "Unable to load Files" });
   }
 };
 
-// export const generateAIQuestionsFromFile = async (req, res) => {
-//   const { question, userId, tokensRequired } = req.body;
-//   if (!question || !userId || !tokensRequired) {
-//     return res.status(400).json({ message: badRequest });
-//   }
-//   const userDetails = await getTokenCount(userId);
-//   if (!userDetails?.tokens) {
-//     return res.status(500).json({ message: internalServerErr });
-//   } else if (userDetails?.tokens < tokensRequired) {
-//     return res
-//       .status(403)
-//       .json({ message: "You don not have enough tokens to generate quiz" });
-//   } else {
-//     try {
-//       const response = await openai.chat.completions.create({
-//         model: MODEL,
-//         messages: [{ role: "user", content: question }],
-//         response_format: { type: "json_object" }
-//       });
-//       const db = await mongoConnectionUtils.getDB();
-//       const userCollection = db.collection("users");
-//       const userQuery = { userId };
-//       const userUpdate = {
-//         $set: {
-//           tokens: userDetails?.tokens - tokensRequired
-//         }
-//       };
-//       const dbOptions = { upsert: true };
-//       const userAck = await userCollection.updateOne(
-//         userQuery,
-//         userUpdate,
-//         dbOptions
-//       );
-//       if (userAck) {
-//         return res.status(200).json({ response });
-//       }
-//     } catch (err) {
-//       console.log(err);
-//       return res.status(500).json({ err });
-//     }
-//   }
-// };
+export const fileAssistant = async (req, res) => {
+  const { userId } = req.body;
+  if (!userId || !req?.file) {
+    return res.status(400).json({ message: badRequest });
+  }
+
+  const fileSizIn100KBCount = Math.ceil(req?.file?.size / 1024 / 100);
+  const userDetails = await getTokenCount(userId);
+  const price = await getProductPrice();
+  const tokensRequired =
+    fileSizIn100KBCount <= 5
+      ? price?.products?.MIN_FILE_TOKEN
+      : fileSizIn100KBCount * price?.products?.FILE_100KB || 50;
+  if (!userDetails?.tokens && userDetails?.tokens !== 0) {
+    return res.status(500).json({ message: internalServerErr });
+  } else if (userDetails?.tokens < tokensRequired) {
+    return res
+      .status(403)
+      .json({ message: "You don not have enough tokens to generate quiz" });
+  } else {
+    try {
+      // Create an assistant
+      const assistant = await openai.beta.assistants.create({
+        name: "My File Search Assistant",
+        instructions:
+          "You are a helpful assistant. Use the knowledge from uploaded files to answer questions.",
+        model: "gpt-4o-mini",
+        tools: [{ type: "file_search" }]
+      });
+      //  assistant.id;
+      const filePath = req.file.path;
+      // Upload the file to OpenAI
+      const fileStream = fs.createReadStream(filePath);
+      const file = await openai.files.create({
+        file: fileStream,
+        purpose: "assistants"
+      });
+      const vectorStore = await openai.beta.vectorStores.create({
+        name: "My Vector Store",
+        file_ids: [file.id]
+      });
+      const thread = await openai.beta.threads.create({
+        messages: [
+          {
+            role: "user",
+            content: `Generate a list of unique exactly 15-20 multiple-choice quizzes on the attached file remember previous context do not give same questions again. The response must strictly include exactly 15-20 questions. If the response contains fewer or more questions, it will not be accepted.
+  Please verify that the total number of questions is 15-20 and provide all questions in one response in the following JSON format:
+  Expected JSON Format:
+  {
+  "quizzes":
+    [
+      {
+        "question": "<Enter the quiz question here>",
+        "options": [
+          {
+            "value": "<Enter the option text here>",
+            "rightAnswer": <true/false to indicate the correct answer>
+          }
+        ],
+        "explanation": "<Provide an explanation if necessary>",
+        "questionName": "<Assign a concise one-word name for the question, but name should not reveal answer>"
+      }
+    ]
+  }
+  1. Provide exactly 15-20 distinct questions.
+  2. Ensure each question is unique, relevant, and has the correct format.
+  3. Include explanations where necessary.
+  Ensure the total number of questions matches exactly 15-20 and provide all questions in one response.`
+          }
+        ],
+        tool_resources: { file_search: { vector_store_ids: [vectorStore.id] } }
+      });
+      // Run the thread and get the response
+      const stream = openai.beta.threads.runs.stream(thread.id, {
+        assistant_id: assistant.id
+      });
+      stream.on("messageDone", (event) => {
+        if (event.content[0].type === "text") {
+          deleteAllFilesInFolder();
+
+          const accessToken = signJWT(
+            {
+              email: userDetails?.email,
+              name: userDetails?.name,
+              userId: userDetails?.userId
+            },
+            "30m"
+          );
+
+          const refreshToken = signJWT(
+            {
+              email: userDetails?.email,
+              name: userDetails?.name,
+              userId: userDetails?.userId
+            },
+            "1y"
+          );
+
+          // Set access and refresh token in cookie
+          res.cookie("accessToken", accessToken, {
+            maxAge: 1800000,
+            httpOnly: true,
+            secure: true,
+            sameSite: "none"
+          });
+
+          res.cookie("refreshToken", refreshToken, {
+            maxAge: 3.154e10, // 1 year
+            httpOnly: true,
+            secure: true,
+            sameSite: "none"
+          });
+          res.status(200).json({
+            answer: event.content[0].text,
+            message: "Quiz generated successfully",
+            fileId: file.id,
+            assistant: assistant.id,
+            vectorStore: vectorStore.id,
+            thread: thread.id
+          });
+        }
+      });
+    } catch (err) {
+      deleteAllFilesInFolder();
+
+      res.status(500).json({
+        message: internalServerErr
+      });
+    }
+  }
+};
+
+const deleteAllFilesInFolder = async () => {
+  const __filename = fileURLToPath(import.meta.url);
+
+  // Get the directory name of the current file
+  const __dirname = path.dirname(__filename);
+
+  const folderPath = path.join(__dirname, "./uploads");
+
+  try {
+    const files = await fs.promises.readdir(folderPath);
+
+    for (const file of files) {
+      const filePath = path.join(folderPath, file);
+      await fs.promises.unlink(filePath);
+    }
+
+    console.log("All files deleted successfully!");
+  } catch (err) {
+    console.error("Error deleting files:", err);
+  }
+};

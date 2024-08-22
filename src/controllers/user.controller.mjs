@@ -122,7 +122,6 @@ export const loginHandler = async (req, res) => {
         message: userNotFound
       });
     }
-    console.log(user);
     // Compare the password
     const result = compareHash(password.toString(), user.password);
     if (!result) {
@@ -135,7 +134,7 @@ export const loginHandler = async (req, res) => {
 
     const accessToken = signJWT(
       { email, name: user?.name, userId: user?.userId },
-      "1m"
+      "30m"
     );
 
     const refreshToken = signJWT(

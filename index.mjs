@@ -11,13 +11,14 @@ const PORT = process.env.PORT || 8000;
 
 app.use(cookieParser());
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+
+app.use(bodyParser.urlencoded({ extended: true }));
 
 app.use(
   cors({
     credentials: true,
     // origin: "https://jijnas-frontend-nvwmghbpda-el.a.run.app",
-    origin: "http://localhost:5173",
+    origin: "https://quiznex.com",
     AccessControlAllowOrigin: "*"
   })
 );

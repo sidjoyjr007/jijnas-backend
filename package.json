@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.mjs",
   "scripts": {
-    "dev": "nodemon index.mjs"
+    "dev": "pm2 start index.mjs"
   },
   "keywords": [],
   "author": "",
@@ -20,8 +20,10 @@
     "iso-country-currency": "^0.7.2",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.8.0",
+    "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.14",
     "openai": "^4.53.2",
+    "pm2": "^5.4.2",
     "razorpay": "^2.9.4",
     "uuid": "^10.0.0"
   }
