@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.mjs",
   "scripts": {
-    "dev": "pm2 start index.mjs"
+    "dev": "node index.mjs"
   },
   "keywords": [],
   "author": "",

@@ -17,7 +17,7 @@ const transport = nodemailer.createTransport({
 export const sendEmailVerificationCode = async (email, code) => {
   const mailOptions = {
     from: userMail,
-    subject: "One Time Password - OTP",
+    subject: "QuizNex One Time Password - OTP",
     html: `<h3>your verification code is:</h3><br/ ><h1>${code}</h1>`,
     to: email
   };
