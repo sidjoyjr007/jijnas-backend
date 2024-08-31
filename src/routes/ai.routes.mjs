@@ -27,7 +27,6 @@ if (!fs.existsSync(uploadDir)) {
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    console.log(file);
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {

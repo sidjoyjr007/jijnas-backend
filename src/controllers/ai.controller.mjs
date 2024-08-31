@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { config } from "dotenv";
 import fs from "fs";
 import path from "path";
+import { v4 as uuidv4 } from "uuid";
 import { getTokenCount } from "./quiz.controller.mjs";
 import strings from "../constants/strings.mjs";
 import mongoConnectionUtils from "../utils/mongo-connection.utils.mjs";
@@ -40,7 +41,11 @@ export const generateAIQuestions = async (req, res) => {
         model: MODEL,
         messages: [{ role: "user", content: question }],
         response_format: { type: "json_object" },
-        stream: true
+        stream: true,
+        temperature: 0.7,
+        // top_p: 1,
+        // frequency_penalty: 0.5,
+        presence_penalty: 0.5
       });
       for await (const chunk of response) {
         if (chunk.choices[0]?.delta?.content) {
@@ -87,6 +92,7 @@ export const generateAIQuestions = async (req, res) => {
         res.cookie("__session", JSON.stringify(sessionData), {
           maxAge: 1800000,
           domain: ".quiznex.com",
+
           path: "/",
           secure: true,
           httpOnly: true,
@@ -95,7 +101,8 @@ export const generateAIQuestions = async (req, res) => {
 
         // res.cookie("refreshToken", refreshToken, {
         //   maxAge: 3.154e10, // 1 year
-        //   domain: ".quiznex.com",
+        //   //domain: ".quiznex.com",
+
         //   path: "/",
         //   secure: true,
         //   httpOnly: true,
@@ -110,17 +117,25 @@ export const generateAIQuestions = async (req, res) => {
 };
 
 export const regenerateInFile = async (req, res) => {
-  const { fileId, assistantId, vectoreStoreId, threadId, userId } = req?.body;
+  const {
+    fileId,
+    assistantId,
+    vectoreStoreId,
+    threadId,
+    userId,
+    instructions
+  } = req?.body;
   if (!fileId || !assistantId || !vectoreStoreId || !threadId) {
     return res.status(400).json({ message: badRequest });
   }
+
   const fileSizIn100KBCount = Math.ceil(req?.file?.size / 1024 / 100);
   const userDetails = await getTokenCount(userId);
   const price = await getProductPrice();
   const tokensRequired =
-    fileSizIn100KBCount <= 10
+    fileSizIn100KBCount <= 6
       ? price?.products?.MIN_FILE_TOKEN
-      : fileSizIn100KBCount * price?.products?.FILE_100KB || 50;
+      : fileSizIn100KBCount * price?.products?.FILE_100KB || 30;
   if (!userDetails?.tokens && userDetails?.tokens !== 0) {
     return res.status(500).json({ message: internalServerErr });
   } else if (userDetails?.tokens < tokensRequired) {
@@ -129,11 +144,54 @@ export const regenerateInFile = async (req, res) => {
       .json({ message: "You don not have enough tokens to generate quiz" });
   } else {
     try {
-      // Run the thread and get the response
-      const stream = openai.beta.threads.runs.stream(threadId, {
-        assistant_id: assistantId,
+      const assistant = await openai.beta.assistants.create({
+        name: `file_search_assistan_${uuidv4()}`,
         instructions:
-          "Do not repeat same questions as earlier always provide unique ones"
+          instructions ||
+          "You are a helpful assistant. Use the knowledge from uploaded files to generate multiple choice quizzes.",
+        model: "gpt-4o-mini",
+        tools: [{ type: "file_search" }],
+        temperature: 0.8
+      });
+
+      const thread = await openai.beta.threads.create({
+        messages: [
+          {
+            role: "user",
+            content: `Generate a list of unique exactly 15-20 multiple-choice quizzes on the attached file remember previous context do not give same questions again. The response must strictly include exactly 15-20 questions. If the response contains fewer or more questions, it will not be accepted.
+  Please verify that the total number of questions is 15-20 and provide all questions in one response in the following JSON format:
+  Expected JSON Format:
+  {
+  "quizzes":
+    [
+      {
+        "question": "<Enter the quiz question here>",
+        "options": [
+          {
+            "value": "<Enter the option text here>",
+            "rightAnswer": <true/false to indicate the correct answer>
+          }
+        ],
+        "explanation": "<Provide an explanation if necessary>",
+        "questionName": "<Assign a concise one-word name for the question, but name should not reveal answer>"
+      }
+    ]
+  }
+  1. Provide exactly 15-20 distinct questions.
+  2. Ensure each question is unique, relevant, and has the correct format.
+  3. Include explanations where necessary.
+  Ensure the total number of questions matches exactly 15-20 and provide all questions in one response.`
+          }
+        ],
+        tool_resources: { file_search: { vector_store_ids: [vectoreStoreId] } }
+      });
+      // Run the thread and get the response
+      const stream = openai.beta.threads.runs.stream(thread.id, {
+        assistant_id: assistant.id,
+        instructions:
+          instructions ||
+          "Do not repeat same questions as earlier always provide unique ones",
+        temperature: 0.8
       });
 
       stream.on("messageDone", (event) => {
@@ -168,7 +226,8 @@ export const regenerateInFile = async (req, res) => {
 
           // res.cookie("refreshToken", refreshToken, {
           //   maxAge: 3.154e10, // 1 year
-          //   domain: ".quiznex.com",
+          //   //domain: ".quiznex.com",
+
           //   path: "/",
           //   secure: true,
           //   httpOnly: true,
@@ -192,7 +251,7 @@ export const regenerateInFile = async (req, res) => {
 };
 
 export const fileAssistant = async (req, res) => {
-  const { userId } = req.body;
+  const { userId, instructions } = req.body;
   if (!userId || !req?.file) {
     return res.status(400).json({ message: badRequest });
   }
@@ -201,9 +260,9 @@ export const fileAssistant = async (req, res) => {
   const userDetails = await getTokenCount(userId);
   const price = await getProductPrice();
   const tokensRequired =
-    fileSizIn100KBCount <= 10
+    fileSizIn100KBCount <= 6
       ? price?.products?.MIN_FILE_TOKEN
-      : fileSizIn100KBCount * price?.products?.FILE_100KB || 50;
+      : fileSizIn100KBCount * price?.products?.FILE_100KB || 30;
   if (!userDetails?.tokens && userDetails?.tokens !== 0) {
     return res.status(500).json({ message: internalServerErr });
   } else if (userDetails?.tokens < tokensRequired) {
@@ -214,11 +273,13 @@ export const fileAssistant = async (req, res) => {
     try {
       // Create an assistant
       const assistant = await openai.beta.assistants.create({
-        name: "My File Search Assistant",
+        name: `file_search_assistan_${uuidv4()}`,
         instructions:
-          "You are a helpful assistant. Use the knowledge from uploaded files to answer questions.",
+          instructions ||
+          "You are a helpful assistant. Use the knowledge from uploaded files to generate multiple choice quizzes.",
         model: "gpt-4o-mini",
-        tools: [{ type: "file_search" }]
+        tools: [{ type: "file_search" }],
+        temperature: 0.8
       });
       //  assistant.id;
       const filePath = req.file.path;
@@ -270,7 +331,6 @@ export const fileAssistant = async (req, res) => {
       stream.on("messageDone", (event) => {
         if (event.content[0].type === "text") {
           deleteAllFilesInFolder();
-          console.log(event.content[0].text);
           const accessToken = signJWT(
             {
               email: userDetails?.email,
@@ -303,7 +363,8 @@ export const fileAssistant = async (req, res) => {
 
           // res.cookie("refreshToken", refreshToken, {
           //   maxAge: 3.154e10, // 1 year
-          //   domain: ".quiznex.com",
+          //   //domain: ".quiznex.com",
+
           //   path: "/",
           //   secure: true,
           //   httpOnly: true,

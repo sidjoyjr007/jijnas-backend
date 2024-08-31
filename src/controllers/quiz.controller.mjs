@@ -15,7 +15,7 @@ export const saveQuiz = async (req, res) => {
     options,
     questionName,
     question,
-    explaination,
+    explanation,
     rightAnswers,
     slideId
   } = req.body;
@@ -46,7 +46,7 @@ export const saveQuiz = async (req, res) => {
           options,
           questionName,
           question,
-          explaination,
+          explanation,
           rightAnswers,
           slideId
         }
@@ -246,7 +246,6 @@ export const getMyEvents = async (req, res) => {
       .sort({ createdAt: -1 })
       .toArray();
     if (result) {
-      console.log(result);
       return res.status(200).json({ message: "Fetched successfully", result });
     }
     res.status(500).json({ message: internalServerErr });
@@ -324,7 +323,6 @@ export const registerUserForEvent = async (req, res) => {
         .collection("user_event_data")
         .insertOne({ name, email, additionalInfo, userEventId, eventId });
       if (registerUser) {
-        console.log(registerUser);
         return res.status(200).json({
           message: "Registered user successfully",
           userData: {
@@ -338,7 +336,6 @@ export const registerUserForEvent = async (req, res) => {
       }
     } else {
       const user = foundUser?.[0];
-      console.log(user);
       if (email !== user?.email || additionalInfo !== user?.additionalInfo) {
         return res
           .status(401)
@@ -358,6 +355,20 @@ export const submitAnswer = async (req, res) => {
   const { userEventId, key, value, answerStats } = req.body;
   const db = await mongoConnectionUtils.getDB();
   try {
+    const isAlreadySubmitted = await db
+      .collection("user_event_data")
+      .find({
+        userEventId,
+        [`questionData.${key}`]: { $exists: true }
+      })
+      .toArray();
+
+    if (isAlreadySubmitted?.length) {
+      return res
+        .status(409)
+        .json({ message: "Answers already submitted for this question" });
+    }
+
     const quizQuery = { userEventId };
     const quizUpdate = {
       $set: {

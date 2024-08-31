@@ -49,7 +49,6 @@ const addTokensToUser = async (params) => {
   try {
     const db = await mongoConnectionUtils.getDB();
     const userDetails = await getTokenCount(userId);
-    console.log(userDetails);
     if (!userDetails?.tokens && userDetails?.tokens !== 0) {
       return false;
     }
@@ -57,7 +56,6 @@ const addTokensToUser = async (params) => {
     const tokensUpdated = await db
       ?.collection("users")
       .updateOne({ userId }, { $set: { tokens: newTokenCount } });
-    console.log(tokensUpdated);
 
     if (tokensUpdated) return true;
     return false;
@@ -94,7 +92,6 @@ export const verifyPayment = async (req, res) => {
   if (generatedSignature === razorpay_signature) {
     addPaymentDetails(req.body);
     const response = await addTokensToUser({ userId, tokens });
-    console.log(response);
     if (response) {
       res.status(200).json({ message: "Payment completed successfully" });
     } else {

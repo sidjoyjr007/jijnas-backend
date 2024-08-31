@@ -82,7 +82,8 @@ export const signupHandler = async (req, res) => {
 
       // res.cookie("refreshToken", refreshToken, {
       //   maxAge: 3.154e10, // 1 year
-      //   domain: ".quiznex.com",
+      //   //domain: ".quiznex.com",
+
       //   path: "/",
       //   secure: true,
       //   httpOnly: true,
@@ -159,7 +160,8 @@ export const loginHandler = async (req, res) => {
 
     // res.cookie("refreshToken", refreshToken, {
     //   maxAge: 3.154e10, // 1 year
-    //   domain: ".quiznex.com",
+    //   //domain: ".quiznex.com",
+
     //   path: "/",
     //   secure: true,
     //   httpOnly: true,
@@ -203,7 +205,8 @@ export const logoutHandler = (req, res) => {
 
   // res.cookie("refreshToken", "", {
   //   maxAge: 0, // 1 year
-  //   domain: ".quiznex.com",
+  //   //domain: ".quiznex.com",
+
   //   path: "/",
   //   secure: true,
   //   httpOnly: true,
@@ -347,7 +350,8 @@ export const getUserDetails = async (req, res) => {
 
     // res.cookie("refreshToken", "", {
     //   maxAge: 0,
-    //   domain: ".quiznex.com",
+    //   //domain: ".quiznex.com",
+
     //   path: "/",
     //   secure: true,
     //   httpOnly: true,
