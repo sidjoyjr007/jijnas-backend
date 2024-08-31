@@ -82,19 +82,25 @@ export const generateAIQuestions = async (req, res) => {
         );
 
         // Set access and refresh token in cookie
-        res.cookie("accessToken", accessToken, {
+        const sessionData = { accessToken, refreshToken };
+
+        res.cookie("__session", JSON.stringify(sessionData), {
           maxAge: 1800000,
-          httpOnly: true,
+          domain: ".quiznex.com",
+          path: "/",
           secure: true,
-          sameSite: "none"
+          httpOnly: true,
+          sameSite: "None"
         });
 
-        res.cookie("refreshToken", refreshToken, {
-          maxAge: 3.154e10, // 1 year
-          httpOnly: true,
-          secure: true,
-          sameSite: "none"
-        });
+        // res.cookie("refreshToken", refreshToken, {
+        //   maxAge: 3.154e10, // 1 year
+        //   domain: ".quiznex.com",
+        //   path: "/",
+        //   secure: true,
+        //   httpOnly: true,
+        //   sameSite: "None"
+        // });
         return res.status(200).json({ response: fullResponse });
       }
     } catch (err) {
@@ -112,7 +118,7 @@ export const regenerateInFile = async (req, res) => {
   const userDetails = await getTokenCount(userId);
   const price = await getProductPrice();
   const tokensRequired =
-    fileSizIn100KBCount <= 5
+    fileSizIn100KBCount <= 10
       ? price?.products?.MIN_FILE_TOKEN
       : fileSizIn100KBCount * price?.products?.FILE_100KB || 50;
   if (!userDetails?.tokens && userDetails?.tokens !== 0) {
@@ -125,7 +131,9 @@ export const regenerateInFile = async (req, res) => {
     try {
       // Run the thread and get the response
       const stream = openai.beta.threads.runs.stream(threadId, {
-        assistant_id: assistantId
+        assistant_id: assistantId,
+        instructions:
+          "Do not repeat same questions as earlier always provide unique ones"
       });
 
       stream.on("messageDone", (event) => {
@@ -147,20 +155,25 @@ export const regenerateInFile = async (req, res) => {
             },
             "1y"
           );
-          // Set access and refresh token in cookie
-          res.cookie("accessToken", accessToken, {
+          const sessionData = { accessToken, refreshToken };
+
+          res.cookie("__session", JSON.stringify(sessionData), {
             maxAge: 1800000,
-            httpOnly: true,
+            domain: ".quiznex.com",
+            path: "/",
             secure: true,
-            sameSite: "none"
+            httpOnly: true,
+            sameSite: "None"
           });
 
-          res.cookie("refreshToken", refreshToken, {
-            maxAge: 3.154e10, // 1 year
-            httpOnly: true,
-            secure: true,
-            sameSite: "none"
-          });
+          // res.cookie("refreshToken", refreshToken, {
+          //   maxAge: 3.154e10, // 1 year
+          //   domain: ".quiznex.com",
+          //   path: "/",
+          //   secure: true,
+          //   httpOnly: true,
+          //   sameSite: "None"
+          // });
           res.status(200).json({
             answer: event.content[0].text,
             message: "Quiz generated successfully",
@@ -188,7 +201,7 @@ export const fileAssistant = async (req, res) => {
   const userDetails = await getTokenCount(userId);
   const price = await getProductPrice();
   const tokensRequired =
-    fileSizIn100KBCount <= 5
+    fileSizIn100KBCount <= 10
       ? price?.products?.MIN_FILE_TOKEN
       : fileSizIn100KBCount * price?.products?.FILE_100KB || 50;
   if (!userDetails?.tokens && userDetails?.tokens !== 0) {
@@ -257,7 +270,7 @@ export const fileAssistant = async (req, res) => {
       stream.on("messageDone", (event) => {
         if (event.content[0].type === "text") {
           deleteAllFilesInFolder();
-
+          console.log(event.content[0].text);
           const accessToken = signJWT(
             {
               email: userDetails?.email,
@@ -277,19 +290,25 @@ export const fileAssistant = async (req, res) => {
           );
 
           // Set access and refresh token in cookie
-          res.cookie("accessToken", accessToken, {
+          const sessionData = { accessToken, refreshToken };
+
+          res.cookie("__session", JSON.stringify(sessionData), {
             maxAge: 1800000,
-            httpOnly: true,
+            domain: ".quiznex.com",
+            path: "/",
             secure: true,
-            sameSite: "none"
+            httpOnly: true,
+            sameSite: "None"
           });
 
-          res.cookie("refreshToken", refreshToken, {
-            maxAge: 3.154e10, // 1 year
-            httpOnly: true,
-            secure: true,
-            sameSite: "none"
-          });
+          // res.cookie("refreshToken", refreshToken, {
+          //   maxAge: 3.154e10, // 1 year
+          //   domain: ".quiznex.com",
+          //   path: "/",
+          //   secure: true,
+          //   httpOnly: true,
+          //   sameSite: "None"
+          // });
           res.status(200).json({
             answer: event.content[0].text,
             message: "Quiz generated successfully",
@@ -301,6 +320,7 @@ export const fileAssistant = async (req, res) => {
         }
       });
     } catch (err) {
+      console.log(err);
       deleteAllFilesInFolder();
 
       res.status(500).json({

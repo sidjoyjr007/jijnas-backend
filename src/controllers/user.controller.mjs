@@ -60,7 +60,7 @@ export const signupHandler = async (req, res) => {
     }
 
     rest.userId = userId;
-    rest.tokens = 100;
+    rest.tokens = 60;
 
     // Insert user to the DB
     const isUserAdded = await addUser(db, name, email, hash, false, rest);
@@ -69,20 +69,25 @@ export const signupHandler = async (req, res) => {
       const accessToken = signJWT({ email, name, userId }, "30m");
       const refreshToken = signJWT({ email, name, userId }, "1y");
 
-      // Set access and refresh token in cookie
-      res.cookie("accessToken", accessToken, {
+      const sessionData = { accessToken, refreshToken };
+
+      res.cookie("__session", JSON.stringify(sessionData), {
         maxAge: 1800000,
-        httpOnly: true,
+        domain: ".quiznex.com",
+        path: "/",
         secure: true,
-        sameSite: "none"
+        httpOnly: true,
+        sameSite: "None"
       });
 
-      res.cookie("refreshToken", refreshToken, {
-        maxAge: 3.154e10, // 1 year
-        httpOnly: true,
-        secure: true,
-        sameSite: "none"
-      });
+      // res.cookie("refreshToken", refreshToken, {
+      //   maxAge: 3.154e10, // 1 year
+      //   domain: ".quiznex.com",
+      //   path: "/",
+      //   secure: true,
+      //   httpOnly: true,
+      //   sameSite: "None"
+      // });
 
       const rate = await getRate(rest?.moreInfo?.currency);
       const price = await getProductPrice();
@@ -141,21 +146,25 @@ export const loginHandler = async (req, res) => {
       { email, name: user?.name, userId: user?.userId },
       "1y"
     );
+    const sessionData = { accessToken, refreshToken };
 
-    // Set access and refresh token in cookie
-    res.cookie("accessToken", accessToken, {
+    res.cookie("__session", JSON.stringify(sessionData), {
       maxAge: 1800000,
-      httpOnly: true,
+      domain: ".quiznex.com",
+      path: "/",
       secure: true,
-      sameSite: "none"
+      httpOnly: true,
+      sameSite: "None"
     });
 
-    res.cookie("refreshToken", refreshToken, {
-      maxAge: 3.154e10, // 1 year
-      httpOnly: true,
-      secure: true,
-      sameSite: "none"
-    });
+    // res.cookie("refreshToken", refreshToken, {
+    //   maxAge: 3.154e10, // 1 year
+    //   domain: ".quiznex.com",
+    //   path: "/",
+    //   secure: true,
+    //   httpOnly: true,
+    //   sameSite: "None"
+    // });
 
     const rate = await getRate(user?.moreInfo?.currency);
     const price = await getProductPrice();
@@ -181,20 +190,25 @@ export const loginHandler = async (req, res) => {
 };
 
 export const logoutHandler = (req, res) => {
-  // Set access and refresh token in cookie
-  res.cookie("accessToken", "", {
+  const sessionData = { accessToken: "", refreshToken: "" };
+
+  res.cookie("__session", JSON.stringify(sessionData), {
     maxAge: 0,
-    httpOnly: true,
+    domain: ".quiznex.com",
+    path: "/",
     secure: true,
-    sameSite: "none"
+    httpOnly: true,
+    sameSite: "None"
   });
 
-  res.cookie("refreshToken", "", {
-    maxAge: 0, // 1 year
-    httpOnly: true,
-    secure: true,
-    sameSite: "none"
-  });
+  // res.cookie("refreshToken", "", {
+  //   maxAge: 0, // 1 year
+  //   domain: ".quiznex.com",
+  //   path: "/",
+  //   secure: true,
+  //   httpOnly: true,
+  //   sameSite: "None"
+  // });
 
   return res.status(200).send({ message: loggedOutSuccess });
 };
@@ -320,19 +334,25 @@ export const getUserDetails = async (req, res) => {
       return res.status(200).json({ userDetails, message: "OK" });
     }
 
-    res.cookie("accessToken", "", {
+    const sessionData = { accessToken: "", refreshToken: "" };
+
+    res.cookie("__session", JSON.stringify(sessionData), {
       maxAge: 0,
-      httpOnly: true,
+      domain: ".quiznex.com",
+      path: "/",
       secure: true,
-      sameSite: "none"
+      httpOnly: true,
+      sameSite: "None"
     });
 
-    res.cookie("refreshToken", "", {
-      maxAge: 0,
-      httpOnly: true,
-      secure: true,
-      sameSite: "none"
-    });
+    // res.cookie("refreshToken", "", {
+    //   maxAge: 0,
+    //   domain: ".quiznex.com",
+    //   path: "/",
+    //   secure: true,
+    //   httpOnly: true,
+    //   sameSite: "None"
+    // });
 
     return res.status(401).json({ message: unAuthorized });
   } catch (err) {

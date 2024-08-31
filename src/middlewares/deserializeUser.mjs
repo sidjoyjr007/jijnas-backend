@@ -1,8 +1,16 @@
 import { signJWT, verifyJWT } from "../utils/jwt.utils.mjs";
 
 function deserializeUser(req, res, next) {
-  const { accessToken, refreshToken } = req.cookies;
-
+  const sessionCookie = req.cookies["__session"];
+  let accessToken;
+  let refreshToken;
+  if (sessionCookie) {
+    const sessionData = JSON.parse(sessionCookie);
+    accessToken = sessionData?.accessToken || "";
+    refreshToken = sessionData?.refreshToken || "";
+  } else {
+    return next();
+  }
   if (!accessToken) {
     return next();
   }
@@ -23,14 +31,17 @@ function deserializeUser(req, res, next) {
   if (!refresh) {
     return next();
   }
+
   const { iat, exp, ...rest } = refresh;
   const newAccessToken = signJWT(rest, "30m");
 
   res.cookie("accessToken", newAccessToken, {
     maxAge: 1800000,
-    httpOnly: true,
+    domain: ".quiznex.com",
+    path: "/",
     secure: true,
-    sameSite: "none"
+    httpOnly: true,
+    sameSite: "None"
   });
 
   req.user = rest;
