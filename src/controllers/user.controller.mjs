@@ -60,7 +60,7 @@ export const signupHandler = async (req, res) => {
     }
 
     rest.userId = userId;
-    rest.tokens = 60;
+    rest.tokens = 150;
 
     // Insert user to the DB
     const isUserAdded = await addUser(db, name, email, hash, false, rest);
@@ -97,7 +97,7 @@ export const signupHandler = async (req, res) => {
         userName: name,
         userEmail: email,
         userId,
-        tokens: 100,
+        tokens: 150,
         moreInfo: rest?.moreInfo,
         verified: false,
         rate,

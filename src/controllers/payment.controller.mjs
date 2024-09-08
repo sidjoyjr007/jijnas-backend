@@ -97,7 +97,7 @@ export const verifyPayment = async (req, res) => {
     } else {
       res.status(207).json({
         message:
-          "Payment completed successfully, but we are unable credit tokens to you, please contact support"
+          "Payment completed successfully, but we are unable update credits in you account, please contact support"
       });
     }
   } else {

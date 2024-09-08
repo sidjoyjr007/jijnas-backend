@@ -5,9 +5,15 @@ config();
 
 const userMail = process.env.USER_MAIL;
 const transport = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
+  host: "smtpout.secureserver.net",
   secure: true,
+  secureConnection: false, // TLS requires secureConnection to be false
+  tls: {
+    ciphers: "SSLv3"
+  },
+  requireTLS: true,
+  port: 465,
+  debug: true,
   auth: {
     user: userMail,
     pass: process.env.USER_PASS

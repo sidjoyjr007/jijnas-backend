@@ -26,8 +26,8 @@ ENV PROJECT_ID=proj_yKaoziqLrcFlafLguok2qcf9
 ENV PROJECT_KEY=sk-proj-lIXo8t9MEgG1oc1P4xjpT3BlbkFJqduFURijUVP7bW0ooqOe
 ENV CLIENT_ID=rzp_live_PjUfbMmCveGtHY
 ENV CLIENT_SECRET=bdvrx4SgfPgXxgU1NzKrD7TZ
-ENV USER_MAIL=jijnasinka@gmail.com
-ENV USER_PASS=xuayiyjjyglkrxui
+ENV USER_MAIL=services@quiznex.com
+ENV USER_PASS=Sidjoyjr@@007
 ENV PORT=8080
 
 # Run the web service on container startup.

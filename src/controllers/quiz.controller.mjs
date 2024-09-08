@@ -17,7 +17,8 @@ export const saveQuiz = async (req, res) => {
     question,
     explanation,
     rightAnswers,
-    slideId
+    slideId,
+    deleted = false
   } = req.body;
 
   try {
@@ -40,6 +41,7 @@ export const saveQuiz = async (req, res) => {
         }
       };
       const slideQuery = { slideId };
+
       const slideUpdate = {
         $set: {
           quizId,
@@ -53,7 +55,11 @@ export const saveQuiz = async (req, res) => {
       };
       const dbOptions = { upsert: true };
       await quizCollection.updateOne(quizQuery, quizUpdate, dbOptions);
-      await slidesCollection.updateOne(slideQuery, slideUpdate, dbOptions);
+      if (deleted) {
+        await slidesCollection.deleteOne(slideQuery);
+      } else {
+        await slidesCollection.updateOne(slideQuery, slideUpdate, dbOptions);
+      }
 
       await session.commitTransaction();
       return res

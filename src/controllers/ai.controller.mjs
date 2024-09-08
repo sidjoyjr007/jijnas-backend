@@ -33,7 +33,7 @@ export const generateAIQuestions = async (req, res) => {
   } else if (userDetails?.tokens < tokensRequired) {
     return res
       .status(403)
-      .json({ message: "You don not have enough tokens to generate quiz" });
+      .json({ message: "You don not have enough credits to generate quiz" });
   } else {
     try {
       let fullResponse = "";
@@ -141,7 +141,7 @@ export const regenerateInFile = async (req, res) => {
   } else if (userDetails?.tokens < tokensRequired) {
     return res
       .status(403)
-      .json({ message: "You don not have enough tokens to generate quiz" });
+      .json({ message: "You don not have enough credits to generate quiz" });
   } else {
     try {
       const assistant = await openai.beta.assistants.create({
@@ -268,7 +268,7 @@ export const fileAssistant = async (req, res) => {
   } else if (userDetails?.tokens < tokensRequired) {
     return res
       .status(403)
-      .json({ message: "You don not have enough tokens to generate quiz" });
+      .json({ message: "You don not have enough credits to generate quiz" });
   } else {
     try {
       // Create an assistant
